@@ -3,5 +3,5 @@
 // Leave these blank to keep everything on this device only (no sign-in, no sync).
 window.DT_CONFIG = {
   SUPABASE_URL: "https://wvxxgxcicxlaotdafauo.supabase.co",
-  SUPABASE_ANON_KEY: ""
+  SUPABASE_ANON_KEY: "sb_publishable_0aqgE3fjfzZrEC-jJ-fejA_MYBJUIfR"
 };
