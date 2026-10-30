@@ -4,23 +4,20 @@ import * as db from './db.js';
 // ---------- session fields ----------
 // phase: before | during | after. "required" fields can't be hidden in Settings.
 export const SESSION_FIELDS = [
-  { key: 'targetWeight', label: 'Target weight', unit: 'kg', phase: 'before', decimal: true },
-  { key: 'washback', label: 'Washback', unit: 'kg', phase: 'before', decimal: true },
-  { key: 'preWeight', label: 'Weight before', unit: 'kg', phase: 'before', decimal: true, required: true },
-  { key: 'ufGoal', label: 'UF goal', unit: 'L', phase: 'before', decimal: true },
-  { key: 'preSys', label: 'Systolic', unit: 'mmHg', phase: 'before', group: 'Blood pressure before' },
-  { key: 'preDia', label: 'Diastolic', unit: 'mmHg', phase: 'before', group: 'Blood pressure before' },
-  { key: 'prePulse', label: 'Pulse', unit: 'bpm', phase: 'before', group: 'Blood pressure before' },
-  { key: 'bloodFlow', label: 'Blood flow achieved', unit: 'ml/min', phase: 'during' },
-  { key: 'arterialPressure', label: 'Arterial pressure', unit: 'mmHg', phase: 'during', signed: true },
-  { key: 'venousPressure', label: 'Venous pressure', unit: 'mmHg', phase: 'during' },
-  { key: 'tmp', label: 'TMP', unit: 'mmHg', phase: 'during' },
-  { key: 'postWeight', label: 'Weight after', unit: 'kg', phase: 'after', decimal: true },
-  { key: 'postSys', label: 'Systolic', unit: 'mmHg', phase: 'after', group: 'Blood pressure after' },
-  { key: 'postDia', label: 'Diastolic', unit: 'mmHg', phase: 'after', group: 'Blood pressure after' },
-  { key: 'postPulse', label: 'Pulse', unit: 'bpm', phase: 'after', group: 'Blood pressure after' },
-  { key: 'ufAchieved', label: 'UF achieved', unit: 'L', phase: 'after', decimal: true },
-  { key: 'bloodVolume', label: 'Blood volume processed', unit: 'L', phase: 'after', decimal: true },
+  { key: 'targetWeight', label: 'Dry weight', unit: 'kg', phase: 'start', decimal: true },
+  { key: 'washback', label: 'Washback', unit: 'kg', phase: 'start', decimal: true },
+  { key: 'preWeight', label: 'Weight before', unit: 'kg', phase: 'start', decimal: true, required: true },
+  { key: 'ufGoal', label: 'UF goal', unit: 'L', phase: 'start', decimal: true },
+  { key: 'preSys', label: 'Systolic', unit: 'mmHg', phase: 'start', group: 'Blood pressure before' },
+  { key: 'preDia', label: 'Diastolic', unit: 'mmHg', phase: 'start', group: 'Blood pressure before' },
+  { key: 'prePulse', label: 'Pulse', unit: 'bpm', phase: 'start', group: 'Blood pressure before' },
+  { key: 'postWeight', label: 'Weight after', unit: 'kg', phase: 'complete', decimal: true },
+  { key: 'postSys', label: 'Systolic', unit: 'mmHg', phase: 'complete', group: 'Blood pressure after' },
+  { key: 'postDia', label: 'Diastolic', unit: 'mmHg', phase: 'complete', group: 'Blood pressure after' },
+  { key: 'postPulse', label: 'Pulse', unit: 'bpm', phase: 'complete', group: 'Blood pressure after' },
+  { key: 'ufAchieved', label: 'UF achieved', unit: 'L', phase: 'complete', decimal: true },
+  { key: 'bloodFlow', label: 'Blood flow achieved', unit: 'ml/min', phase: 'complete' },
+  { key: 'bloodVolume', label: 'Blood volume processed', unit: 'L', phase: 'complete', decimal: true },
 ];
 export const FIELD = Object.fromEntries(SESSION_FIELDS.map(f => [f.key, f]));
 
@@ -28,13 +25,14 @@ export const DEFAULT_SETTINGS = {
   name: '',
   targetWeight: null,
   washback: null,
-  sessionsPerWeek: 3,
-  weeklyDay: 1,            // 0 Sun .. 6 Sat. Sessions on this day use the weekly extras.
+  dialysisDays: [1, 3, 5], // 0 Sun .. 6 Sat
+  sessionsPerWeek: 3,      // kept in step with dialysisDays
+  weeklyDay: 1,            // sessions on this day use the weekly items
   orderNowWeeks: 2,        // "Order now" when less than this many weeks left
   lowWeeks: 4.33,          // "Running low" when less than this (4.33 weeks = a month)
   orderToWeeks: 4.33,      // order enough to last this long
-  filterEveryWeeks: 4.33,  // how often water filters are changed
-  hidden: { tmp: true },
+  filterEveryWeeks: 4.33,  // how often the monthly change (filters etc.) happens
+  hidden: {},
   givenOptions: ['Aranesp', 'Dressing changed'],
   lockEnabled: false,
 };
@@ -43,12 +41,24 @@ export function settings() {
   const s = db.get('settings');
   const out = { ...DEFAULT_SETTINGS, ...(s || {}) };
   out.hidden = { ...DEFAULT_SETTINGS.hidden, ...((s && s.hidden) || {}) };
+  if (!Array.isArray(out.dialysisDays) || !out.dialysisDays.length) out.dialysisDays = DEFAULT_SETTINGS.dialysisDays;
+  out.sessionsPerWeek = out.dialysisDays.length;
   delete out.id;
   return out;
 }
 export function saveSettings(patch) {
   const cur = settings();
-  return db.put('settings', { ...cur, ...patch, id: 'settings' });
+  const next = { ...cur, ...patch, id: 'settings' };
+  next.dialysisDays = [...new Set(next.dialysisDays)].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
+  next.sessionsPerWeek = next.dialysisDays.length;
+  if (!next.dialysisDays.includes(next.weeklyDay) && next.dialysisDays.length) next.weeklyDay = next.dialysisDays[0];
+  return db.put('settings', next);
+}
+export const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+// First run: nothing set up yet on this account.
+export function needsSetup() {
+  return !db.get('settings') && !db.list('session').length && !db.list('item').length;
 }
 export function visibleFields(phase) {
   const hidden = settings().hidden;
@@ -93,6 +103,12 @@ const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export const dayName = i => DAYS_LONG[i];
+export const dayShort = i => DAYS[i];
+export function nextDialysisDay(fromISO = todayISO()) {
+  const days = settings().dialysisDays;
+  for (let i = 0; i < 8; i++) { const d = addDays(fromISO, i); if (days.includes(weekday(d))) return d; }
+  return null;
+}
 export function niceDate(iso, { year = false, day = true } = {}) {
   if (!iso) return '';
   const d = parseISO(iso);
@@ -121,6 +137,7 @@ export function newSession(date = todayISO()) {
     washback: st.washback,
     filtersChanged: false,
     given: [],
+    notes: [],
     comments: '',
     startedAt: new Date().toISOString(),
   };
@@ -157,6 +174,9 @@ export function stockFor(item, ctx) {
     const c = checks[0];
     base = num(c.counted) || 0; baseDate = c.date; inclusive = false;
   } else {
+    if (item.openingStock === null || item.openingStock === undefined || item.openingStock === '') {
+      return { current: null, received: 0, used: 0, weeklyUse: weeklyUse(item, st), weeksLeft: null, status: 'uncounted', orderQty: 0 };
+    }
     base = num(item.openingStock) || 0; baseDate = item.openingDate || '0000-00-00'; inclusive = true;
   }
   const after = d => inclusive ? d >= baseDate : d > baseDate;
@@ -177,11 +197,55 @@ export function stockContext() {
   return { allSessions: sessions(), allDeliveries: deliveries(), allChecks: stockChecks(), st: settings() };
 }
 
-export const STATUS_LABEL = { now: 'Order now', low: 'Running low', ok: 'OK', none: '' };
+export const STATUS_LABEL = { now: 'Order now', low: 'Running low', ok: 'OK', none: '', uncounted: 'Not counted' };
 
-export const STARTER_ITEMS = [
-  ['Acid', 'canister', 1, 0, 0], ['Bicarb', 'cartridge', 1, 0, 0], ['Dialyser', 'unit', 1, 0, 0],
-  ['Lines', 'set', 1, 0, 0], ['Needles', 'each', 2, 0, 0], ['On/off sterile kits', 'kit', 2, 0, 0],
-  ['Prefilled flush syringes', 'each', 4, 0, 0], ['10ml syringes', 'each', 2, 0, 0], ['Heparin', 'each', 1, 0, 0],
-  ['Sterile gloves', 'pair', 2, 0, 0], ['Dressings', 'each', 0, 1, 0], ['Carbon filter', 'each', 0, 0, 1], ['Micron filter', 'each', 0, 0, 1],
-].map(([name, unit, perSession, perWeekly, perFilterChange], i) => ({ name, unit, perSession, perWeekly, perFilterChange, openingStock: 0, openingDate: todayISO(), trackStock: true, order: i }));
+// Offered during setup. [name, unit, how often, how many, ticked by default]
+// how often: 'session' (every session), 'week' (on the weekly day), 'month' (when the monthly change is done)
+export const COMMON_SUPPLIES = [
+  ['Acid concentrate', 'canister', 'session', 1, true],
+  ['Bicarbonate cartridge', 'cartridge', 'session', 1, true],
+  ['Dialyser', 'unit', 'session', 1, true],
+  ['Blood lines', 'set', 'session', 1, true],
+  ['On/off sterile packs', 'pack', 'session', 2, true],
+  ['Prefilled flush syringes', 'each', 'session', 4, true],
+  ['10ml syringes', 'each', 'session', 2, true],
+  ['2ml syringes', 'each', 'session', 2, true],
+  ['Heparin', 'each', 'session', 1, true],
+  ['Sterile gloves', 'pair', 'session', 2, true],
+  ['Fistula needles', 'each', 'session', 2, false],
+  ['Saline bags', 'bag', 'session', 1, false],
+  ['Alcohol wipes', 'each', 'session', 4, false],
+  ['Dressings', 'each', 'week', 1, true],
+  ['Dressing applicators', 'each', 'week', 1, false],
+  ['Needle-free connectors', 'each', 'week', 2, false],
+  ['Carbon filter', 'each', 'month', 1, true],
+  ['Micron filter', 'each', 'month', 1, true],
+  ['Water softener salt', 'bag', 'month', 1, false],
+];
+export function itemFromChoice({ name, unit, freq, qty, stock }, order) {
+  const q = num(qty) || 0;
+  return {
+    name, unit, order, trackStock: true, openingDate: todayISO(),
+    openingStock: stock === null || stock === undefined || stock === '' ? null : num(stock),
+    perSession: freq === 'session' ? q : 0, perWeekly: freq === 'week' ? q : 0, perFilterChange: freq === 'month' ? q : 0,
+  };
+}
+export function itemFrequency(it) {
+  if (num(it.perSession)) return { freq: 'session', qty: num(it.perSession) };
+  if (num(it.perWeekly)) return { freq: 'week', qty: num(it.perWeekly) };
+  if (num(it.perFilterChange)) return { freq: 'month', qty: num(it.perFilterChange) };
+  return { freq: 'session', qty: 0 };
+}
+export const STARTER_ITEMS = COMMON_SUPPLIES.filter(c => c[4]).map(([name, unit, freq, qty], i) => itemFromChoice({ name, unit, freq, qty, stock: null }, i));
+
+// Notes on a session: older records have one "comments" text, newer ones a list of timed notes.
+export function sessionNotes(s) {
+  const out = [];
+  if (s.comments) out.push({ at: null, text: s.comments });
+  for (const n of s.notes || []) out.push(n);
+  return out;
+}
+export function notesText(s) {
+  return sessionNotes(s).map(n => (n.at ? new Date(n.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' ' : '') + n.text).join('. ');
+}
+export function monthlyItems() { return items().filter(it => num(it.perFilterChange)); }

@@ -1,9 +1,9 @@
 # Dialysis Tracker
 
 A web app for home dialysis patients. You can:
-- log each session, with the "to take off" sum shown in full
-- log blood pressure readings between sessions
-- track supplies, which go down each time you log a session
+- go through a short setup the first time: dialysis days, dry weight and washback, and the supplies you use
+- start a session (weight, blood pressure, the "to take off" sum shown in full), add notes while it runs, then complete it (weight after, blood pressure, machine figures)
+- track supplies, which go down each time you complete a session
 - send your records to your medical team as Excel, CSV or a PDF report
 
 It's a test version (0.1) for personal use. It keeps records only and gives no medical advice.
@@ -59,8 +59,8 @@ For password reset emails, use the same iCloud SMTP setup as Spotter's Logbook (
 3. Never commit that file to this repo.
 
 ## Good to know
-- **To take off** = (weight before + washback) − target weight. The UF goal is filled in from it and can be changed.
-- **Supplies:** each session uses the items set as "every session". Sessions on your weekly day also use the weekly extras. Ticking "Water filters changed" uses the filter items. A **Count stock** resets the numbers to what you actually have.
+- **To take off** = (weight before + washback) − dry weight. The UF goal is filled in from it and can be changed.
+- **Supplies:** each session uses the items set as "every session". Sessions on your weekly day also use the weekly items. Ticking "Monthly change done" uses the monthly items, such as water filters. A **Count stock** resets the numbers to what you actually have.
 - **Free plan pause:** Supabase pauses a free project after a week with no use. If the app says it can't sync, open the Supabase dashboard and click **Restore**.
 - **Face ID** is a lock on this device's screen. Your password is still the real sign-in, and "Use password instead" always works when you're online.
 - **Backups:** **Settings → Download backup** saves everything as one file at any time.

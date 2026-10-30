@@ -4,15 +4,15 @@ import * as sync from './sync.js';
 import * as lock from './lock.js';
 import * as today from './views/today.js';
 import * as sessions from './views/sessions.js';
-import * as bp from './views/bp.js';
 import * as supplies from './views/supplies.js';
 import * as reports from './views/reports.js';
 import * as settings from './views/settings.js';
+import { startSetup } from './views/onboarding.js';
+import * as M from './model.js';
 
 const ROUTES = {
   today: { title: 'Today', view: today, tab: true, label: 'Today' },
   sessions: { title: 'Sessions', view: sessions, tab: true, label: 'Sessions' },
-  bp: { title: 'Blood pressure', view: bp, tab: true, label: 'BP' },
   supplies: { title: 'Supplies', view: supplies, tab: true, label: 'Supplies' },
   reports: { title: 'Reports', view: reports, tab: true, label: 'Reports' },
   settings: { title: 'Settings', view: settings },
@@ -104,7 +104,7 @@ function showSignIn() {
     if (!email.value.trim()) { err.textContent = 'Enter your email first, then tap Forgot password.'; return; }
     try { await sync.sendReset(email.value.trim()); toast('Check your email for a reset link'); } catch (ex) { err.textContent = ex.message; }
   });
-  gate(h('h1', null, 'Dialysis Tracker'), h('p', { class: 'lead' }, 'Sign in to see your sessions, readings and supplies.'), form, forgot);
+  gate(h('h1', null, 'Dialysis Tracker'), h('p', { class: 'lead' }, 'Sign in to see your sessions and supplies. New here? You’ll be taken through a short setup after signing in.'), form, forgot);
   setTimeout(() => email.focus(), 50);
 }
 
@@ -145,13 +145,14 @@ function showLock() {
   });
   gate(h('h1', null, 'Locked'), h('p', { class: 'lead' }, 'Your records are locked on this device.'), btn, err, usePw);
 }
-function unlocked() { buildShell(); render(); }
+function unlocked() { if (M.needsSetup()) { start(); return; } buildShell(); render(); }
 
 // ---------- start ----------
 async function start() {
   if (sync.configured && sync.state.recovery) { showNewPassword(); return; }
   if (sync.configured && !sync.state.user) { showSignIn(); return; }
   if (sync.state.user && await lock.enabledHere()) { showLock(); return; }
+  if (M.needsSetup()) { startSetup(root, { mark: MARK, onDone: () => { history.replaceState(null, '', '/#today'); buildShell(); render(); } }); return; }
   buildShell();
   await render();
 }

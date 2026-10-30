@@ -14,34 +14,43 @@ function unitWord(n, unit) {
   return unit + (/(s|x|ch|sh)$/.test(unit) ? 'es' : 's');
 }
 
-function badge(status) { return status === 'none' ? null : h('span', { class: 'badge ' + status }, M.STATUS_LABEL[status]); }
+function badge(status) { return status === 'none' ? null : h('span', { class: 'badge ' + (status === 'uncounted' ? 'ok' : status) }, M.STATUS_LABEL[status]); }
+
+export const FREQ_LABEL = { session: 'Every session', week: 'Weekly session only', month: 'Monthly change' };
+export function freqSelect(value) {
+  const st = M.settings();
+  const sel = h('select', null,
+    h('option', { value: 'session' }, 'Every session'),
+    h('option', { value: 'week' }, `Weekly, on ${M.dayName(st.weeklyDay)}`),
+    h('option', { value: 'month' }, 'Monthly change'));
+  sel.value = value;
+  return sel;
+}
 
 export function openItem(item) {
-  const it = item ? { ...item } : { name: '', unit: 'each', perSession: 1, perWeekly: 0, perFilterChange: 0, openingStock: 0, openingDate: M.todayISO(), trackStock: true, order: M.items().length };
+  const it = item ? { ...item } : { name: '', unit: 'each', perSession: 1, perWeekly: 0, perFilterChange: 0, openingStock: null, openingDate: M.todayISO(), trackStock: true, order: M.items().length };
   const isNew = !it.id;
-  const st = M.settings();
+  const f = M.itemFrequency(it);
   const name = h('input', { type: 'text', value: it.name, autofocus: isNew, autocomplete: 'off' });
   const unit = h('input', { type: 'text', value: it.unit || '', placeholder: 'each, box, canister', autocomplete: 'off' });
-  const ps = numberInput(it.perSession), pw = numberInput(it.perWeekly), pf = numberInput(it.perFilterChange);
-  const open = numberInput(it.openingStock), openDate = h('input', { type: 'date', value: it.openingDate || M.todayISO() });
+  const qty = numberInput(f.qty || 1), freq = freqSelect(f.freq);
+  const open = numberInput(it.openingStock, { placeholder: 'Not counted' }), openDate = h('input', { type: 'date', value: it.openingDate || M.todayISO() });
   const track = h('input', { type: 'checkbox', role: 'switch' }); track.checked = it.trackStock !== false;
   const err = h('p', { class: 'err', role: 'alert' });
   const body = h('div', { class: 'form' },
-    field({ label: 'Item', input: name }), field({ label: 'Counted in', input: unit }),
-    h('fieldset', null, h('legend', null, 'How many you use'),
-      h('div', { class: 'grid3' },
-        field({ label: 'Every session', input: ps }),
-        field({ label: `Extra on ${M.dayName(st.weeklyDay).slice(0, 3)}`, input: pw }),
-        field({ label: 'Filter change', input: pf }))),
+    field({ label: 'Item', input: name }),
+    h('div', { class: 'grid2' }, field({ label: 'How many you use', input: qty }), field({ label: 'How often', input: freq })),
+    field({ label: 'Counted in', input: unit }),
     h('div', { class: 'grid2' }, field({ label: 'Starting stock', input: open }), field({ label: 'Counted on', input: openDate })),
-    h('p', { class: 'hint' }, 'Sessions and deliveries from this date onwards are added to or taken off the starting stock. Use Count stock later to correct it.'),
+    h('p', { class: 'hint' }, 'Sessions and deliveries from this date are added to or taken off the starting stock. Use Count stock later to correct it.'),
     h('label', { class: 'toggle' }, h('span', null, 'Warn me when it runs low', h('small', null, 'Turn off for things your unit gives you')), track),
     err,
     !isNew ? h('button', { type: 'button', class: 'btn ghost', style: { color: 'var(--art)', justifySelf: 'start' }, onclick: del }, 'Delete this item') : null);
   const saveBtn = h('button', { type: 'button', class: 'btn primary' }, isNew ? 'Add item' : 'Save changes');
   saveBtn.addEventListener('click', async () => {
     if (!name.value.trim()) { err.textContent = 'Give the item a name.'; return; }
-    await db.put('item', { ...it, name: name.value.trim(), unit: unit.value.trim(), perSession: readNum(ps) || 0, perWeekly: readNum(pw) || 0, perFilterChange: readNum(pf) || 0, openingStock: readNum(open) || 0, openingDate: openDate.value || M.todayISO(), trackStock: track.checked });
+    const base = M.itemFromChoice({ name: name.value.trim(), unit: unit.value.trim(), freq: freq.value, qty: readNum(qty), stock: readNum(open) }, it.order);
+    await db.put('item', { ...it, ...base, openingDate: openDate.value || M.todayISO(), trackStock: track.checked });
     sheet.close(); toast(isNew ? 'Item added' : 'Item saved');
   });
   async function del() {
@@ -60,11 +69,11 @@ function openQuantities(mode) {
   const inputs = new Map();
   const lines = its.map(it => {
     const s = M.stockFor(it, ctx);
-    const inp = numberInput(null, { placeholder: mode === 'count' ? M.fmt(s.current) : '0' });
+    const inp = numberInput(null, { placeholder: mode === 'count' ? (s.current === null ? '' : M.fmt(s.current)) : '0' });
     inp.setAttribute('aria-label', `${it.name}, ${mode === 'count' ? 'counted' : 'received'}`);
     inputs.set(it.id, inp);
     return h('div', { class: 'qty-line' },
-      h('div', { class: 'n' }, it.name, h('small', null, mode === 'count' ? `App says ${plural(s.current, it.unit)}` : (s.orderQty ? `Ordered about ${M.fmt(s.orderQty)}` : plural(s.current, it.unit) + ' now'))),
+      h('div', { class: 'n' }, it.name, h('small', null, s.current === null ? 'Not counted yet' : mode === 'count' ? `App says ${plural(s.current, it.unit)}` : (s.orderQty ? `Ordered about ${M.fmt(s.orderQty)}` : plural(s.current, it.unit) + ' now'))),
       inp);
   });
   const body = h('div', { class: 'form' },
@@ -86,6 +95,8 @@ function openQuantities(mode) {
   });
   const sheet = openSheet({ title: mode === 'count' ? 'Count stock' : 'Log a delivery', body, footer: [btn] });
 }
+
+export { openQuantities };
 
 export function openOrderList() {
   const ctx = M.stockContext();
@@ -116,7 +127,7 @@ export function render(main) {
   const its = M.items();
   if (!its.length) {
     const starter = h('button', { type: 'button', class: 'btn primary' }, 'Add common items');
-    starter.addEventListener('click', async () => { await db.put('item', M.STARTER_ITEMS); toast('Common items added. Set your starting stock for each.'); });
+    starter.addEventListener('click', async () => { await db.put('item', M.STARTER_ITEMS.map(x => ({ ...x }))); toast('Common items added. Count your stock next.'); });
     main.replaceChildren(h('div', { class: 'panel empty' },
       h('p', null, 'Track the supplies you use. Each session you log takes its items off your stock, and the app tells you when to order.'),
       h('div', { class: 'btn-row' }, starter, h('button', { type: 'button', class: 'btn', onclick: () => openItem() }, 'Add an item'))));
@@ -125,15 +136,19 @@ export function render(main) {
   const ctx = M.stockContext();
   const rows = its.map(it => ({ it, s: M.stockFor(it, ctx) }));
   const now = rows.filter(r => r.s.status === 'now').length, low = rows.filter(r => r.s.status === 'low').length;
+  const uncounted = rows.filter(r => r.s.status === 'uncounted').length;
   main.replaceChildren(...[
     h('div', { class: 'btn-row' },
       h('button', { type: 'button', class: 'btn primary', onclick: () => openQuantities('delivery') }, 'Log a delivery'),
       h('button', { type: 'button', class: 'btn', onclick: () => openQuantities('count') }, 'Count stock'),
       h('button', { type: 'button', class: 'btn', onclick: openOrderList }, 'Order list')),
+    uncounted ? h('div', { class: 'panel pad', style: { display: 'grid', gap: '10px' } },
+      h('p', null, h('b', null, `${uncounted} item${uncounted === 1 ? '' : 's'} not counted yet. `), 'Count what you have now, and the app will keep the numbers up to date from each session.'),
+      h('button', { type: 'button', class: 'btn primary', style: { justifySelf: 'start' }, onclick: () => openQuantities('count') }, 'Count stock')) : null,
     (now || low) ? h('p', { class: 'lead' }, [now ? `${now} to order now` : '', low ? `${low} running low` : ''].filter(Boolean).join(', ') + '.') : null,
     h('div', { class: 'panel rows' }, rows.map(({ it, s }) => h('button', { type: 'button', class: 'row stock-row', onclick: () => openItem(it) },
       h('span', { class: 't' }, it.name),
-      h('span', { class: 's' }, plural(s.current, it.unit), s.weeksLeft !== null && it.trackStock !== false ? `, ${weeks(s.weeksLeft)}` : ''),
+      h('span', { class: 's' }, s.current === null ? `${FREQ_LABEL[M.itemFrequency(it).freq]}: ${M.fmt(M.itemFrequency(it).qty)}` : plural(s.current, it.unit), s.weeksLeft !== null && it.trackStock !== false ? `, ${weeks(s.weeksLeft)}` : ''),
       h('span', { class: 'v' }, badge(s.status), s.orderQty && s.status !== 'ok' && s.status !== 'none' ? h('small', null, `order ${M.fmt(s.orderQty)}`) : null)))),
     h('button', { type: 'button', class: 'btn ghost', style: { justifySelf: 'start' }, onclick: () => openItem() }, icon('plus'), 'Add an item'),
     h('p', { class: 'hint' }, `Weeks left are based on ${ctx.st.sessionsPerWeek} sessions a week. Change this in Settings.`)].filter(Boolean));

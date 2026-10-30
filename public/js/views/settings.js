@@ -18,28 +18,34 @@ export async function render(main, { go }) {
   // ---- treatment ----
   const name = h('input', { type: 'text', value: st.name, autocomplete: 'name' });
   name.addEventListener('change', () => save({ name: name.value.trim() }));
-  const spw = numberInput(st.sessionsPerWeek, { decimal: false });
-  spw.addEventListener('change', () => { const v = readNum(spw); if (v > 0) save({ sessionsPerWeek: v }); });
-  const day = h('select', null, [1, 2, 3, 4, 5, 6, 0].map(d => h('option', { value: d }, M.dayName(d))));
+  const day = h('select', null, st.dialysisDays.map(d => h('option', { value: d }, M.dayName(d))));
   day.value = String(st.weeklyDay);
   day.addEventListener('change', () => save({ weeklyDay: +day.value }));
+  const dayChips = h('div', { class: 'chips days' }, M.DAY_ORDER.map(d => h('button', {
+    type: 'button', class: 'chip', 'aria-pressed': String(st.dialysisDays.includes(d)), 'aria-label': M.dayName(d),
+    onclick: () => {
+      const cur = M.settings().dialysisDays;
+      const next = cur.includes(d) ? cur.filter(x => x !== d) : [...cur, d];
+      if (!next.length) { toast('Keep at least one dialysis day'); return; }
+      save({ dialysisDays: next });
+    },
+  }, M.dayShort(d))));
 
   const treatment = h('section', { class: 'section' },
     h('div', { class: 'section-head' }, h('h2', null, 'Your treatment')),
     h('div', { class: 'panel pad form' },
       field({ label: 'Your name', input: name, hint: 'Shown at the top of reports for your team.' }),
       h('div', { class: 'grid2' },
-        numSetting('targetWeight', 'Target weight', 'kg'),
+        numSetting('targetWeight', 'Dry weight', 'kg'),
         numSetting('washback', 'Washback', 'kg')),
-      h('p', { class: 'hint' }, 'Used to fill in each new session. To take off = (weight before + washback) − target weight.'),
-      h('div', { class: 'grid2' },
-        field({ label: 'Sessions a week', input: spw }),
-        field({ label: 'Weekly extras on', input: day })),
-      h('p', { class: 'hint' }, 'Sessions on this day use your weekly extras, such as dressings.')));
+      h('p', { class: 'hint' }, 'Used to fill in each new session. To take off = (weight before + washback) − dry weight.'),
+      h('fieldset', null, h('legend', null, 'Dialysis days'), dayChips,
+        h('p', { class: 'hint' }, `${st.sessionsPerWeek} session${st.sessionsPerWeek === 1 ? '' : 's'} a week. Used to work out how long supplies last.`)),
+      field({ label: 'Weekly items on', input: day, hint: 'Sessions on this day also use your weekly items, such as dressings.' })));
 
   // ---- fields ----
   const optional = M.SESSION_FIELDS.filter(f => !f.required);
-  const phaseName = { before: 'Before', during: 'During', after: 'After' };
+  const phaseName = { start: 'When you start', complete: 'When you complete' };
   const fieldToggles = h('section', { class: 'section' },
     h('div', { class: 'section-head' }, h('h2', null, 'What you record')),
     h('div', { class: 'panel pad' },
@@ -48,7 +54,7 @@ export async function render(main, { go }) {
         const cb = h('input', { type: 'checkbox', role: 'switch' });
         cb.checked = !st.hidden[f.key];
         cb.addEventListener('change', () => save({ hidden: { ...M.settings().hidden, [f.key]: !cb.checked } }));
-        return h('label', { class: 'toggle' }, h('span', null, f.group ? `${f.group}: ${f.label.toLowerCase()}` : f.label, h('small', null, phaseName[f.phase] + ' the session')), cb);
+        return h('label', { class: 'toggle' }, h('span', null, f.group ? `${f.group}: ${f.label.toLowerCase()}` : f.label, h('small', null, phaseName[f.phase])), cb);
       })));
 
   // ---- given/done options ----
@@ -76,7 +82,7 @@ export async function render(main, { go }) {
         numSetting('lowWeeks', '“Running low” under', 'weeks')),
       h('div', { class: 'grid2' },
         numSetting('orderToWeeks', 'Order enough for', 'weeks'),
-        numSetting('filterEveryWeeks', 'Filters changed every', 'weeks')),
+        numSetting('filterEveryWeeks', 'Monthly change every', 'weeks')),
       h('p', { class: 'hint' }, '4.33 weeks is one month.')));
 
   // ---- account ----

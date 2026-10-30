@@ -15,11 +15,11 @@ function sessionTable(sessions) {
     head.push(label(f)); cols.push(s => s[f.key] ?? null);
     if (f.key === 'preWeight') { head.push('To take off (kg)'); cols.push(s => M.takeOff(s)); }
   }
-  head.push('Filters changed', 'Given or done', 'Notes', 'Finished');
+  head.push('Monthly change done', 'Given or done', 'Notes', 'Completed');
   const rows = [...sessions].sort((a, b) => a.date.localeCompare(b.date)).map(s => [
     s.date, s.type === 'weekly' ? 'Weekly' : 'Routine',
     ...cols.map(c => c(s)),
-    s.filtersChanged ? 'Yes' : 'No', (s.given || []).join(', '), s.comments || '', s.status === 'complete' ? 'Yes' : 'No',
+    s.filtersChanged ? 'Yes' : 'No', (s.given || []).join(', '), M.notesText(s), s.status === 'complete' ? 'Yes' : 'No',
   ]);
   return { head, rows };
 }
@@ -68,13 +68,11 @@ export async function downloadExcel(sessions, readings, from, to) {
   const notesCol = s.head.indexOf('Notes');
   const sw = s.head.map((hd, i) => i === notesCol ? 60 : null);
   XLSX.utils.book_append_sheet(wb, sheet(s, sw), 'Sessions');
-  const b = bpTable(readings);
-  XLSX.utils.book_append_sheet(wb, sheet(b, [12, 8, 12, 15, 16, 12, 40]), 'BP readings');
   const about = [
     ['Dialysis records'], ['Name', st.name || ''], ['From', ukDate(from)], ['To', ukDate(to)],
-    ['Sessions', sessions.length], ['BP readings between sessions', readings.length],
+    ['Sessions', sessions.length],
     ['Created', new Date().toLocaleString('en-GB')],
-    ['To take off', '(Weight before + washback) − target weight'],
+    ['To take off', '(Weight before + washback) − dry weight'],
   ];
   const wsA = XLSX.utils.aoa_to_sheet(about); wsA['!cols'] = [{ wch: 30 }, { wch: 44 }];
   XLSX.utils.book_append_sheet(wb, wsA, 'About');

@@ -19,11 +19,13 @@ export function update(el, { preWeight, washback, targetWeight }) {
       h('div', { class: 'op', 'aria-hidden': 'true' }, '+'),
       term('wb', wb, 'washback'),
       h('div', { class: 'op', 'aria-hidden': 'true' }, '−'),
-      term('tw', tw, 'target weight')),
-    h('div', { class: 'sum-result' },
-      h('b', { class: ready ? '' : 'pending' }, ready ? fmt1(result) : '—'),
+      term('tw', tw, 'dry weight')),
+    ready ? h('div', { class: 'sum-result' },
+      h('b', null, fmt1(result)),
       h('span', null, 'kg'),
-      h('span', { class: 'what' }, tw === null ? 'Set your target weight in Settings' : 'to take off')),
+      h('span', { class: 'what' }, 'to take off'))
+      : h('div', { class: 'sum-result waiting' },
+        h('span', null, tw === null ? 'Set your dry weight in Settings to see what to take off.' : 'Enter your weight before to see what to take off.')),
   );
   el.setAttribute('aria-label', ready ? `To take off: ${fmt1(result)} kilograms` : 'To take off: waiting for weights');
 }
