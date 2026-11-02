@@ -47,6 +47,9 @@ The publishable key is meant to be public. The database rules only let each sign
 
 For password reset emails, use the same iCloud SMTP setup as Spotter's Logbook (**Authentication → Emails → SMTP Settings**).
 
+### 2b. Share links (database update 2)
+Already applied. `supabase/002-share-links.sql` adds share links: a private address showing your completed sessions for one date range, which expires and can be stopped.
+
 ### 3. Add it to your iPhone home screen
 1. Open the site in Safari.
 2. Tap **Share → Add to Home Screen**. It then opens full screen like an app.

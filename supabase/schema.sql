@@ -19,7 +19,7 @@ create index if not exists records_sync_idx on public.records (user_id, synced_a
 
 -- The server stamps synced_at, so devices with slightly wrong clocks still sync correctly.
 create or replace function public.records_stamp()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin
   new.synced_at := clock_timestamp();
   return new;

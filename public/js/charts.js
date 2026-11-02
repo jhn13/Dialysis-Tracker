@@ -76,7 +76,7 @@ export function weightChart(sessions) {
   const post = ss.map(s => s.postWeight != null ? [f.x(s.date), f.y(s.postWeight)] : null);
   const tgt = ss.map(s => s.targetWeight != null ? [f.x(s.date), f.y(s.targetWeight)] : null);
   const dots = (pts, c) => pts.filter(Boolean).map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${c}" stroke="#fff" stroke-width="2"/>`).join('');
-  const markup = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight before and after each session, with target weight">
+  const markup = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight before and after each session, with dry weight">
     ${f.base}
     <path class="ref" d="${path(tgt)}" fill="none"/>
     <path d="${path(pre)}" fill="none" stroke="${RED}" stroke-width="2" stroke-linejoin="round"/>
@@ -87,14 +87,14 @@ export function weightChart(sessions) {
   const wrap = h('div', { class: 'chart', html: markup });
   withHover(wrap, wrap.querySelector('svg'), ss.map(s => f.x(s.date)), i => {
     const s = ss[i];
-    return `<b>${M.niceDate(s.date)}</b><br>Before ${M.fmt1(s.preWeight) || '—'} kg<br>After ${M.fmt1(s.postWeight) || '—'} kg<br>Target ${M.fmt1(s.targetWeight) || '—'} kg`;
+    return `<b>${M.niceDate(s.date)}</b><br>Before ${M.fmt1(s.preWeight) || '—'} kg<br>After ${M.fmt1(s.postWeight) || '—'} kg<br>Dry weight ${M.fmt1(s.targetWeight) || '—'} kg`;
   });
   return h('div', { class: 'section' },
     h('div', { class: 'section-head' }, h('h2', null, 'Weight')),
     h('div', { class: 'legend' },
       h('span', null, h('i', { style: { background: RED } }), 'Before'),
       h('span', null, h('i', { style: { background: BLUE } }), 'After'),
-      h('span', null, h('i', { class: 'dash' }), 'Target')),
+      h('span', null, h('i', { class: 'dash' }), 'Dry weight')),
     h('div', { class: 'panel pad' }, wrap));
 }
 

@@ -8,6 +8,7 @@ import * as supplies from './views/supplies.js';
 import * as reports from './views/reports.js';
 import * as settings from './views/settings.js';
 import { startSetup } from './views/onboarding.js';
+import { renderSharedPage } from './views/share.js';
 import * as M from './model.js';
 
 const ROUTES = {
@@ -158,6 +159,12 @@ async function start() {
 }
 
 async function boot() {
+  if (location.pathname.replace(/\/$/, '') === '/share') {
+    // Someone opening a share link: show the records only. No sign-in, nothing saved on their device.
+    document.getElementById('boot').remove();
+    await renderSharedPage(root, MARK);
+    return;
+  }
   await db.load();
   await sync.init();
   db.onChange(() => { drawSync(); if (mainEl && mainEl.isConnected) rerenderSoon(); });

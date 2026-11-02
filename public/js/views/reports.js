@@ -2,6 +2,8 @@ import { h, field, toast } from '../ui.js';
 import * as M from '../model.js';
 import { weightChart, bpChart } from '../charts.js';
 import * as X from '../export.js';
+import * as sync from '../sync.js';
+import { openShareSheet, sharedLinks } from './share.js';
 
 let preset = '30';
 let custom = { from: null, to: null };
@@ -18,35 +20,12 @@ function range() {
   return { from: custom.from || M.addDays(today, -29), to: custom.to || today };
 }
 
-const avg = arr => { const v = arr.filter(x => x != null && !isNaN(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+export function rangeLabel(from, to) {
+  return `${M.niceDate(from, { year: from.slice(0, 4) !== to.slice(0, 4), day: false })} to ${M.niceDate(to, { year: true, day: false })}`;
+}
 
-export function render(main) {
-  const st = M.settings();
-  const { from, to } = range();
-  const inRange = x => x.date >= from && x.date <= to;
-  const sessions = M.sessions().filter(inRange);
-  const readings = [];
-
-  const seg = h('div', { class: 'seg no-print', role: 'group', 'aria-label': 'Date range' },
-    [['30', 'Last 30 days'], ['this', 'This month'], ['last', 'Last month'], ['custom', 'Choose']].map(([k, label]) =>
-      h('button', { type: 'button', 'aria-pressed': String(preset === k), onclick: () => { preset = k; if (k === 'custom') custom = range(); render(main); } }, label)));
-
-  let pickers = null;
-  if (preset === 'custom') {
-    const f = h('input', { type: 'date', value: from, max: to }), t = h('input', { type: 'date', value: to, min: from });
-    f.addEventListener('change', () => { if (f.value) { custom.from = f.value; render(main); } });
-    t.addEventListener('change', () => { if (t.value) { custom.to = t.value; render(main); } });
-    pickers = h('div', { class: 'grid2 no-print' }, field({ label: 'From', input: f }), field({ label: 'To', input: t }));
-  }
-
-  const busy = async (btn, fn) => { btn.disabled = true; try { await fn(); } catch (e) { console.error(e); toast('Couldn’t create the file. Try again.'); } finally { btn.disabled = false; } };
-  const excel = h('button', { type: 'button', class: 'btn primary' }, 'Download Excel');
-  excel.addEventListener('click', () => busy(excel, () => X.downloadExcel(sessions, readings, from, to)));
-  const pdf = h('button', { type: 'button', class: 'btn' }, 'Print or save as PDF');
-  pdf.addEventListener('click', () => window.print());
-  const csvS = h('button', { type: 'button', class: 'btn small' }, 'Sessions CSV');
-  csvS.addEventListener('click', () => busy(csvS, () => X.downloadCSV('sessions', sessions, readings, from, to)));
-  const rangeText = `${M.niceDate(from, { year: from.slice(0, 4) !== to.slice(0, 4), day: false })} to ${M.niceDate(to, { year: true, day: false })}`;
+// Stats, charts and the table: shared by Reports and the public share page.
+export function reportContent(sessions) {
   const bpAvg = (a, b) => { const s = avg(sessions.map(x => x[a])), d = avg(sessions.map(x => x[b])); return s === null || d === null ? '—' : `${Math.round(s)}/${Math.round(d)}`; };
   const kg = v => v === null ? '—' : M.fmt1(Math.round(v * 10) / 10);
   const stats = h('div', { class: 'stats' },
@@ -70,8 +49,43 @@ export function render(main) {
         h('td', null, bp(s.preSys, s.preDia)), h('td', null, bp(s.postSys, s.postDia)), h('td', null, v(s.bloodFlow)),
         h('td', { class: 'note' }, [...(s.given || []).filter(g => !M.notesText(s).toLowerCase().includes(g.toLowerCase().split(' ')[0])), M.notesText(s)].filter(Boolean).join('. ')))))))) : null;
 
-  const bpTable = null;
+  return [sessions.length ? stats : null, weightChart(sessions), bpChart(sessions), sessionTable].filter(Boolean);
+}
+
+const avg = arr => { const v = arr.filter(x => x != null && !isNaN(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+
+export function render(main) {
+  const st = M.settings();
+  const { from, to } = range();
+  const inRange = x => x.date >= from && x.date <= to;
+  const sessions = M.sessions().filter(inRange);
+  const readings = [];
+
+  const seg = h('div', { class: 'seg no-print', role: 'group', 'aria-label': 'Date range' },
+    [['30', '30 days'], ['this', 'This month'], ['last', 'Last month'], ['custom', 'Custom']].map(([k, label]) =>
+      h('button', { type: 'button', 'aria-pressed': String(preset === k), onclick: () => { preset = k; if (k === 'custom') custom = range(); render(main); } }, label)));
+
+  let pickers = null;
+  if (preset === 'custom') {
+    const f = h('input', { type: 'date', value: from, max: to }), t = h('input', { type: 'date', value: to, min: from });
+    f.addEventListener('change', () => { if (f.value) { custom.from = f.value; render(main); } });
+    t.addEventListener('change', () => { if (t.value) { custom.to = t.value; render(main); } });
+    pickers = h('div', { class: 'grid2 no-print' }, field({ label: 'From', input: f }), field({ label: 'To', input: t }));
+  }
+
+  const busy = async (btn, fn) => { btn.disabled = true; try { await fn(); } catch (e) { console.error(e); toast('Couldn’t create the file. Try again.'); } finally { btn.disabled = false; } };
+  const excel = h('button', { type: 'button', class: 'btn primary' }, 'Download Excel');
+  excel.addEventListener('click', () => busy(excel, () => X.downloadExcel(sessions, readings, from, to)));
+  const pdf = h('button', { type: 'button', class: 'btn' }, 'Print or save as PDF');
+  pdf.addEventListener('click', () => window.print());
+  const csvS = h('button', { type: 'button', class: 'btn small' }, 'Sessions CSV');
+  csvS.addEventListener('click', () => busy(csvS, () => X.downloadCSV('sessions', sessions, readings, from, to)));
+  const rangeText = rangeLabel(from, to);
   const nothing = !sessions.length;
+  const shareBtn = h('button', { type: 'button', class: 'btn' }, 'Share link');
+  shareBtn.addEventListener('click', () => openShareSheet({ from, to, count: sessions.filter(s => s.status === 'complete').length, onCreated: () => render(main) }));
+  const linksSlot = h('div', { class: 'no-print' });
+  if (sync.configured && sync.state.user) sharedLinks().then(el => { if (el) linksSlot.replaceChildren(el); }).catch(() => {});
   main.replaceChildren(...[
     h('div', { class: 'print-only' },
       h('h1', { style: { fontSize: '20pt', marginBottom: '4px' } }, `Dialysis records${st.name ? ' for ' + st.name : ''}`),
@@ -80,8 +94,7 @@ export function render(main) {
     seg, pickers,
     h('p', { class: 'lead no-print' }, nothing ? `Nothing recorded from ${rangeText}.` : `${rangeText}: ${sessions.length} session${sessions.length === 1 ? '' : 's'}.`),
     nothing ? null : h('div', { class: 'section no-print' },
-      h('div', { class: 'btn-row' }, excel, pdf),
-      h('div', { class: 'btn-row' }, csvS)),
-    nothing ? null : stats,
-    weightChart(sessions), bpChart(sessions), sessionTable, bpTable].filter(Boolean));
+      h('div', { class: 'btn-row' }, excel, sync.configured ? shareBtn : null),
+      h('div', { class: 'btn-row' }, pdf, csvS)),
+    ...reportContent(sessions), linksSlot].filter(Boolean));
 }

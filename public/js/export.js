@@ -5,8 +5,8 @@ import { deliverFile, loadScript } from './ui.js';
 
 const ukDate = iso => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; };
 
-function sessionTable(sessions) {
-  const st = M.settings();
+function sessionTable(sessions, st = M.settings()) {
+  st = { ...M.DEFAULT_SETTINGS, ...st, hidden: { ...(st.hidden || {}) } };
   const fields = M.SESSION_FIELDS.filter(f => f.required || !st.hidden[f.key]);
   const label = f => (f.group ? f.group.replace('Blood pressure', 'BP') + ' ' + f.label.toLowerCase() : f.label) + (f.unit ? ` (${f.unit})` : '');
   const head = ['Date', 'Session type'];
@@ -46,16 +46,15 @@ function csv({ head, rows }) {
 
 const stamp = (from, to) => `${from}_to_${to}`;
 
-export async function downloadCSV(kind, sessions, readings, from, to) {
-  const t = kind === 'sessions' ? sessionTable(sessions) : bpTable(readings);
+export async function downloadCSV(kind, sessions, readings, from, to, st = M.settings()) {
+  const t = kind === 'sessions' ? sessionTable(sessions, st) : bpTable(readings);
   const blob = new Blob([csv(t)], { type: 'text/csv;charset=utf-8' });
   await deliverFile(blob, `dialysis-${kind === 'sessions' ? 'sessions' : 'bp'}_${stamp(from, to)}.csv`, 'Dialysis records');
 }
 
-export async function downloadExcel(sessions, readings, from, to) {
+export async function downloadExcel(sessions, readings, from, to, st = M.settings()) {
   await loadScript('/vendor/xlsx.mini.min.js');
   const XLSX = window.XLSX;
-  const st = M.settings();
   const wb = XLSX.utils.book_new();
   const sheet = ({ head, rows }, widths) => {
     const aoa = [head, ...rows.map(r => r.map((v, i) => i === 0 && typeof v === 'string' ? M.parseISO(v) : v))];
@@ -64,7 +63,7 @@ export async function downloadExcel(sessions, readings, from, to) {
     ws['!cols'] = head.map((hd, i) => ({ wch: widths && widths[i] || Math.max(10, Math.min(28, hd.length + 2)) }));
     return ws;
   };
-  const s = sessionTable(sessions);
+  const s = sessionTable(sessions, st);
   const notesCol = s.head.indexOf('Notes');
   const sw = s.head.map((hd, i) => i === notesCol ? 60 : null);
   XLSX.utils.book_append_sheet(wb, sheet(s, sw), 'Sessions');

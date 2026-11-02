@@ -365,3 +365,16 @@ tr:last-child td { border-bottom: 0; }
 .sum .term b.pending { color: var(--line-strong); }
 
 .choice { display: grid; gap: 6px; }
+
+/* ---------- share page ---------- */
+.shared { max-width: 860px; margin: 0 auto; padding: calc(16px + var(--safe-t)) 18px 48px; }
+.shared-head { display: flex; align-items: center; gap: 10px; font-weight: 800; padding: 4px 0 18px; }
+.shared-head svg { width: 30px; height: 30px; }
+.shared main { padding: 0; display: grid; gap: 22px; max-width: none; }
+.shared h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
+.link-row { grid-template-columns: 1fr auto; }
+.link-row .v .btn-row { flex-wrap: nowrap; }
+@media print { .shared { padding: 0; } .shared-head { padding-bottom: 6px; } }
+.grid2 > *, .grid3 > * { min-width: 0; }
+.field input[type="date"], .field input[type="time"] { min-width: 0; -webkit-appearance: none; appearance: none; display: block; }
+.seg button { padding: 0 6px; font-size: 15.5px; }

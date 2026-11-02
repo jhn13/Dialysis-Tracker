@@ -122,3 +122,35 @@ export function syncNow() {
 }
 
 export const pending = () => db.dirtyRecords().length;
+
+// ---------- share links ----------
+const token = () => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const missingTable = e => /shares|get_share|schema cache|does not exist/i.test((e && e.message) || '');
+const friendly = e => missingTable(e) ? new Error('Share links need a one-time database update (supabase/002-share-links.sql).') : e;
+
+export async function createShare({ from, to, days, label }) {
+  if (!client || !state.user) throw new Error('Sign in to create share links.');
+  await syncNow(); // make sure the latest sessions are on the server first
+  const row = { token: token(), user_id: state.user.id, date_from: from, date_to: to, label: label || '', expires_at: new Date(Date.now() + days * 86400000).toISOString() };
+  const { error } = await client.from('shares').insert(row);
+  if (error) throw friendly(error);
+  return { ...row, url: `${location.origin}/share#${row.token}` };
+}
+export async function listShares() {
+  if (!client || !state.user) return [];
+  const { data, error } = await client.from('shares').select('*').eq('revoked', false).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false });
+  if (error) throw friendly(error);
+  return data.map(r => ({ ...r, url: `${location.origin}/share#${r.token}` }));
+}
+export async function revokeShare(tok) {
+  const { error } = await client.from('shares').update({ revoked: true }).eq('token', tok);
+  if (error) throw friendly(error);
+}
+// Used by the public share page: no sign-in, nothing saved on the viewer's device.
+export async function fetchShare(tok) {
+  if (!configured) throw new Error('This site isn’t connected to its database.');
+  const anon = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+  const { data, error } = await anon.rpc('get_share', { p_token: tok });
+  if (error) throw friendly(error);
+  return data;
+}
