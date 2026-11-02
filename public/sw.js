@@ -1,6 +1,6 @@
 // Keeps the app working offline. Uses the network first so updates show straight away,
 // and falls back to the saved copy when there's no signal.
-const CACHE = 'dt-v4';
+const CACHE = 'dt-v5';
 const SHELL = [
   '/', '/index.html', '/css/app.css', '/js/config.js', '/vendor/supabase.js',
   '/js/app.js', '/js/db.js', '/js/model.js', '/js/sync.js', '/js/lock.js', '/js/ui.js', '/js/sum.js', '/js/charts.js', '/js/export.js',

@@ -85,6 +85,20 @@ export function confirmBox({ title, message, confirm = 'Confirm', danger = false
   });
 }
 
+// Several choices; resolves with the chosen value, or null if closed.
+export function choiceBox({ title, message, options }) {
+  return new Promise(resolve => {
+    let done = false;
+    const btns = options.map(o => {
+      const b = h('button', { type: 'button', class: 'btn block ' + (o.primary ? 'primary' : '') }, o.label);
+      b.addEventListener('click', () => { done = true; s.close(); resolve(o.value); });
+      return h('div', { class: 'choice' }, b, o.hint ? h('p', { class: 'hint' }, o.hint) : null);
+    });
+    const s = openSheet({ title, body: [h('p', { class: 'lead' }, message), ...btns], onClose: () => { if (!done) resolve(null); } });
+    s.el.classList.add('small');
+  });
+}
+
 let toastEl = null, toastTimer = null;
 export function toast(msg) {
   if (!toastEl) { toastEl = h('div', { class: 'toast', role: 'status', 'aria-live': 'polite' }); document.body.append(toastEl); }

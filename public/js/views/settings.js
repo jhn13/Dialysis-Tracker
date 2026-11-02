@@ -1,4 +1,4 @@
-import { h, field, numberInput, readNum, toast, confirmBox } from '../ui.js';
+import { h, field, numberInput, readNum, toast, confirmBox, choiceBox } from '../ui.js';
 import * as db from '../db.js';
 import * as M from '../model.js';
 import * as sync from '../sync.js';
@@ -129,8 +129,9 @@ export async function render(main, { go }) {
   fileIn.addEventListener('change', async () => {
     const f = fileIn.files[0]; if (!f) return;
     try {
-      const r = await X.restoreBackup(f);
-      toast(r.applied ? `Restored ${r.applied} record${r.applied === 1 ? '' : 's'}` : 'Everything in that backup is already here');
+      const r = await X.restoreBackup(f, { ask: info => X.askAboutSupplies(info, choiceBox) });
+      if (r.cancelled) toast('Nothing restored');
+      else toast(r.applied ? `Restored ${r.applied} record${r.applied === 1 ? '' : 's'}${r.sessions ? `, including ${r.sessions} sessions` : ''}` : 'Everything in that backup is already here');
     } catch (e) { toast(e.message); }
     fileIn.value = '';
   });

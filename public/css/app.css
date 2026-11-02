@@ -363,3 +363,5 @@ tr:last-child td { border-bottom: 0; }
 .sum-result.waiting { padding: 14px 0 6px; }
 .sum-result.waiting span { font-size: 16px; font-weight: 400; color: var(--muted); }
 .sum .term b.pending { color: var(--line-strong); }
+
+.choice { display: grid; gap: 6px; }

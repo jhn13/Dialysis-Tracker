@@ -88,14 +88,45 @@ export async function downloadBackup() {
   await deliverFile(blob, `dialysis-backup_${M.todayISO()}.json`, 'Dialysis Tracker backup');
 }
 
-export async function restoreBackup(file) {
+// ask({ backupItems, localItems }) decides what happens when both have a supplies list: 'keep' or 'replace'.
+export async function restoreBackup(file, { ask } = {}) {
   const text = await file.text();
   let json;
   try { json = JSON.parse(text); } catch (e) { throw new Error('That file isn’t a Dialysis Tracker backup.'); }
   if (!json || json.app !== 'dialysis-tracker' || !Array.isArray(json.records)) throw new Error('That file isn’t a Dialysis Tracker backup.');
   const kinds = new Set(['settings', 'session', 'bp', 'item', 'delivery', 'stockcheck']);
-  const rows = json.records.filter(r => r && typeof r.id === 'string' && kinds.has(r.kind) && r.data && typeof r.data === 'object')
+  let rows = json.records.filter(r => r && typeof r.id === 'string' && kinds.has(r.kind) && r.data && typeof r.data === 'object')
     .map(r => ({ id: r.id, kind: r.kind, data: r.data, updated_at: r.updated_at || new Date().toISOString(), deleted: false }));
+
+  const backupItems = rows.filter(r => r.kind === 'item');
+  const localItems = M.items();
+  const backupIds = new Set(backupItems.map(r => r.id));
+  const sameList = localItems.length && localItems.every(it => backupIds.has(it.id));
+  if (backupItems.length && localItems.length && !sameList && ask) {
+    const choice = await ask({ backupItems: backupItems.length, localItems: localItems.length });
+    if (!choice) return { cancelled: true };
+    if (choice === 'keep') {
+      rows = rows.filter(r => !['item', 'delivery', 'stockcheck', 'settings'].includes(r.kind));
+    } else {
+      const old = new Set(localItems.map(i => i.id));
+      const linked = [...M.deliveries(), ...M.stockChecks()].filter(x => old.has(x.itemId)).map(x => x.id);
+      await db.remove([...old, ...linked]);
+      const now = new Date().toISOString();
+      rows = rows.map(r => r.kind === 'settings' ? { ...r, updated_at: now } : r);
+    }
+  }
   const n = await db.applyIncoming(rows, { markDirty: true });
-  return { total: rows.length, applied: n };
+  const sessions = rows.filter(r => r.kind === 'session').length;
+  return { total: rows.length, applied: n, sessions };
+}
+
+export function askAboutSupplies({ backupItems, localItems }, choiceBox) {
+  return choiceBox({
+    title: 'Which supplies list?',
+    message: `The backup has its own supplies list (${backupItems} items). You already have ${localItems} items set up here. Your sessions are added either way.`,
+    options: [
+      { label: 'Use the backup’s list', value: 'replace', primary: true, hint: 'Replaces your current items with the backup’s, including its stock counts and deliveries.' },
+      { label: 'Keep my current list', value: 'keep', hint: 'Only sessions are added. Your items, stock counts and settings stay as they are.' },
+    ],
+  });
 }
