@@ -10,6 +10,7 @@ import * as settings from './views/settings.js';
 import { startSetup } from './views/onboarding.js';
 import { renderSharedPage } from './views/share.js';
 import * as M from './model.js';
+import * as theme from './theme.js';
 
 const ROUTES = {
   today: { title: 'Today', view: today, tab: true, label: 'Today' },
@@ -57,12 +58,21 @@ function buildShell() {
   titleEl = h('h1');
   syncBtn = h('button', { type: 'button', class: 'sync', title: 'Sync status', onclick: () => { if (sync.state.user) sync.syncNow(); else go('settings'); } }, h('span', { class: 'dot', 'aria-hidden': 'true' }), h('span', { class: 'txt' }));
   const gear = h('a', { class: 'icon-btn', href: '#settings', 'aria-label': 'Settings' }, icon('settings'));
+  const themeBtn = h('button', { type: 'button', class: 'icon-btn theme-btn' });
+  const drawTheme = () => {
+    const dark = theme.resolved() === 'dark';
+    themeBtn.replaceChildren(icon(dark ? 'sun' : 'moon'));
+    themeBtn.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    themeBtn.title = themeBtn.getAttribute('aria-label');
+  };
+  themeBtn.addEventListener('click', () => theme.toggle());
+  theme.onChange(drawTheme); drawTheme();
   mainEl = h('main', { id: 'main', tabindex: '-1' });
   tabsEl = h('nav', { class: 'tabs', 'aria-label': 'Main' },
     Object.entries(ROUTES).filter(([, r]) => r.tab).map(([k, r]) => h('a', { class: 'tab', href: '#' + k, 'data-r': k }, icon(k), h('span', null, r.label))));
   root.replaceChildren(
     h('div', { class: 'brand-side' }, svg(MARK), 'Dialysis Tracker'),
-    h('div', { class: 'app' }, h('header', { class: 'topbar' }, titleEl, syncBtn, gear), mainEl),
+    h('div', { class: 'app' }, h('header', { class: 'topbar' }, titleEl, syncBtn, themeBtn, gear), mainEl),
     tabsEl);
   drawSync();
 }
@@ -159,6 +169,8 @@ async function start() {
 }
 
 async function boot() {
+  theme.apply();
+  theme.onChange(() => { if (mainEl && mainEl.isConnected && currentRoute() === 'settings') render(); });
   if (location.pathname.replace(/\/$/, '') === '/share') {
     // Someone opening a share link: show the records only. No sign-in, nothing saved on their device.
     document.getElementById('boot').remove();

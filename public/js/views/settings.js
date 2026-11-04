@@ -4,6 +4,7 @@ import * as M from '../model.js';
 import * as sync from '../sync.js';
 import * as lock from '../lock.js';
 import * as X from '../export.js';
+import * as theme from '../theme.js';
 
 export async function render(main, { go }) {
   const st = M.settings();
@@ -42,6 +43,16 @@ export async function render(main, { go }) {
       h('fieldset', null, h('legend', null, 'Dialysis days'), dayChips,
         h('p', { class: 'hint' }, `${st.sessionsPerWeek} session${st.sessionsPerWeek === 1 ? '' : 's'} a week. Used to work out how long supplies last.`)),
       field({ label: 'Weekly items on', input: day, hint: 'Sessions on this day also use your weekly items, such as dressings.' })));
+
+  // ---- appearance ----
+  const cur = theme.choice();
+  const appearance = h('section', { class: 'section' },
+    h('div', { class: 'section-head' }, h('h2', null, 'Appearance')),
+    h('div', { class: 'panel pad form' },
+      h('div', { class: 'seg', role: 'group', 'aria-label': 'Appearance' },
+        [['system', 'Match device'], ['light', 'Light'], ['dark', 'Dark']].map(([k, label]) =>
+          h('button', { type: 'button', 'aria-pressed': String(cur === k), onclick: () => theme.set(k) }, label))),
+      h('p', { class: 'hint' }, 'Match device follows your phone’s light or dark setting. Saved on this device only.')));
 
   // ---- fields ----
   const optional = M.SESSION_FIELDS.filter(f => !f.required);
@@ -147,6 +158,6 @@ export async function render(main, { go }) {
         if (await confirmBox({ title: 'Delete everything on this device?', message: 'All sessions, readings, supplies and settings on this device will be deleted. Download a backup first if you want to keep them.', confirm: 'Delete everything', danger: true })) { await db.wipe(); toast('Everything deleted'); go('today'); }
       } }, 'Delete everything on this device') : null));
 
-  main.replaceChildren(treatment, fieldToggles, given, supplies, account, backup,
+  main.replaceChildren(treatment, appearance, fieldToggles, given, supplies, account, backup,
     h('p', { class: 'hint', style: { textAlign: 'center' } }, 'Dialysis Tracker, test version 0.1. For keeping records only. It doesn’t give medical advice.'));
 }

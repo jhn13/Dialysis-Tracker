@@ -4,7 +4,9 @@ import { h } from './ui.js';
 import * as M from './model.js';
 
 const W = 680, H = 240, PAD = { l: 44, r: 16, t: 14, b: 30 };
-const RED = '#C8322F', BLUE = '#2C5FA8';
+// Colours come from the theme (light, dark, print), so the charts follow it without redrawing.
+const RED = 'var(--chart-before)', BLUE = 'var(--chart-after)', RING = 'var(--surface)', CROSS = 'var(--ink-2)';
+function themeColours() {}
 
 function niceTicks(min, max, count = 4) {
   const span = max - min || 1;
@@ -68,6 +70,7 @@ function withHover(wrap, svgEl, xs, tipFor) {
 }
 
 export function weightChart(sessions) {
+  themeColours();
   const ss = [...sessions].filter(s => s.preWeight != null || s.postWeight != null).sort((a, b) => a.date.localeCompare(b.date));
   if (!ss.length) return null;
   const vals = ss.flatMap(s => [s.preWeight, s.postWeight, s.targetWeight]).filter(v => v != null);
@@ -75,14 +78,14 @@ export function weightChart(sessions) {
   const pre = ss.map(s => s.preWeight != null ? [f.x(s.date), f.y(s.preWeight)] : null);
   const post = ss.map(s => s.postWeight != null ? [f.x(s.date), f.y(s.postWeight)] : null);
   const tgt = ss.map(s => s.targetWeight != null ? [f.x(s.date), f.y(s.targetWeight)] : null);
-  const dots = (pts, c) => pts.filter(Boolean).map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${c}" stroke="#fff" stroke-width="2"/>`).join('');
+  const dots = (pts, c) => pts.filter(Boolean).map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="4" style="fill:${c};stroke:${RING}" stroke-width="2"/>`).join('');
   const markup = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weight before and after each session, with dry weight">
     ${f.base}
     <path class="ref" d="${path(tgt)}" fill="none"/>
-    <path d="${path(pre)}" fill="none" stroke="${RED}" stroke-width="2" stroke-linejoin="round"/>
-    <path d="${path(post)}" fill="none" stroke="${BLUE}" stroke-width="2" stroke-linejoin="round"/>
+    <path d="${path(pre)}" fill="none" style="stroke:${RED}" stroke-width="2" stroke-linejoin="round"/>
+    <path d="${path(post)}" fill="none" style="stroke:${BLUE}" stroke-width="2" stroke-linejoin="round"/>
     ${dots(pre, RED)}${dots(post, BLUE)}
-    <line class="cross" y1="${PAD.t}" y2="${H - PAD.b}" stroke="#48535F" stroke-width="1" style="opacity:0"/>
+    <line class="cross" y1="${PAD.t}" y2="${H - PAD.b}" stroke-width="1" style="opacity:0;stroke:${CROSS}"/>
   </svg>`;
   const wrap = h('div', { class: 'chart', html: markup });
   withHover(wrap, wrap.querySelector('svg'), ss.map(s => f.x(s.date)), i => {
@@ -100,6 +103,7 @@ export function weightChart(sessions) {
 
 // Each session gets two upright bars, diastolic to systolic: before (red) and after (blue).
 export function bpChart(sessions) {
+  themeColours();
   const ss = [...sessions].filter(s => (s.preSys != null && s.preDia != null) || (s.postSys != null && s.postDia != null)).sort((a, b) => a.date.localeCompare(b.date));
   if (!ss.length) return null;
   const vals = ss.flatMap(s => [s.preSys, s.preDia, s.postSys, s.postDia]).filter(v => v != null);
@@ -109,7 +113,7 @@ export function bpChart(sessions) {
   const off = bw / 2 + 1;
   const bar = (x, a, b, c) => {
     const y1 = f.y(Math.max(a, b)), y2 = f.y(Math.min(a, b));
-    return `<rect x="${(x - bw / 2).toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(2, y2 - y1).toFixed(1)}" rx="${Math.min(4, bw / 2)}" fill="${c}"/>`;
+    return `<rect x="${(x - bw / 2).toFixed(1)}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(2, y2 - y1).toFixed(1)}" rx="${Math.min(4, bw / 2)}" style="fill:${c}"/>`;
   };
   const bars = ss.map(s => {
     const x = f.x(s.date);
@@ -118,7 +122,7 @@ export function bpChart(sessions) {
   }).join('');
   const markup = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Blood pressure before and after each session">
     ${f.base}${bars}
-    <line class="cross" y1="${PAD.t}" y2="${H - PAD.b}" stroke="#48535F" stroke-width="1" style="opacity:0"/>
+    <line class="cross" y1="${PAD.t}" y2="${H - PAD.b}" stroke-width="1" style="opacity:0;stroke:${CROSS}"/>
   </svg>`;
   const wrap = h('div', { class: 'chart', html: markup });
   withHover(wrap, wrap.querySelector('svg'), ss.map(s => f.x(s.date)), i => {

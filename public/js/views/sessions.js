@@ -116,7 +116,7 @@ export function notesBlock(s, { save, placeholder = 'Alarms, pressures, anything
     };
     add.addEventListener('click', doAdd);
     ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doAdd(); } });
-    wrap.replaceChildren(
+    wrap.replaceChildren(...[
       list.length ? h('ul', { class: 'note-list' }, list.map((n, i) => h('li', null,
         h('span', { class: 'when' }, n.at ? timeOf(n.at) : 'Note'),
         h('span', { class: 'what' }, n.text),
@@ -124,7 +124,7 @@ export function notesBlock(s, { save, placeholder = 'Alarms, pressures, anything
           if (n.at === null) s.comments = ''; else s.notes = (s.notes || []).filter(x => x !== n);
           if (save) await save(); draw();
         } }, icon('close'))))) : null,
-      h('div', { class: 'note-add' }, ta, add));
+      h('div', { class: 'note-add' }, ta, add)].filter(Boolean));
   };
   draw();
   return wrap;
