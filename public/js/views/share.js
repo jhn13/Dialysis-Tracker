@@ -115,6 +115,6 @@ export async function renderSharedPage(root, mark) {
       h('p', { class: 'lead' }, `${rangeText}: ${sessions.length} completed session${sessions.length === 1 ? '' : 's'}.`),
       h('p', { class: 'hint' }, `Shared on ${expiryText(data.created_at)}. This link works until ${expiryText(data.expires_at)}. Recorded by the patient at home. To take off = (weight before + washback) − dry weight.`)),
     sessions.length ? h('div', { class: 'section no-print' }, h('div', { class: 'btn-row' }, excel, csv, pdf)) : null,
-    ...(sessions.length ? reportContent(sessions) : [h('div', { class: 'panel empty' }, h('p', null, 'No completed sessions in these dates.'))]),
+    ...(sessions.length ? reportContent(sessions, st.hidden) : [h('div', { class: 'panel empty' }, h('p', null, 'No completed sessions in these dates.'))]),
   );
 }

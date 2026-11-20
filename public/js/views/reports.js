@@ -25,29 +25,40 @@ export function rangeLabel(from, to) {
 }
 
 // Stats, charts and the table: shared by Reports and the public share page.
-export function reportContent(sessions) {
+export function reportContent(sessions, hidden = M.settings().hidden) {
+  hidden = hidden || {};
   const bpAvg = (a, b) => { const s = avg(sessions.map(x => x[a])), d = avg(sessions.map(x => x[b])); return s === null || d === null ? '—' : `${Math.round(s)}/${Math.round(d)}`; };
   const kg = v => v === null ? '—' : M.fmt1(Math.round(v * 10) / 10);
   const stats = h('div', { class: 'stats' },
-    h('div', { class: 'stat' }, h('b', null, sessions.length), h('span', null, 'sessions')),
     h('div', { class: 'stat' }, h('b', null, kg(avg(sessions.map(s => s.preWeight)))), h('span', null, 'average weight before, kg')),
     h('div', { class: 'stat' }, h('b', null, kg(avg(sessions.map(s => s.postWeight)))), h('span', null, 'average weight after, kg')),
     h('div', { class: 'stat' }, h('b', null, kg(avg(sessions.map(s => s.ufAchieved)))), h('span', null, 'average UF achieved, L')),
+    h('div', { class: 'stat' }, h('b', null, kg(avg(sessions.map(s => s.bloodVolume)))), h('span', null, 'average blood volume processed, L')),
     h('div', { class: 'stat' }, h('b', null, bpAvg('preSys', 'preDia')), h('span', null, 'average BP before')),
     h('div', { class: 'stat' }, h('b', null, bpAvg('postSys', 'postDia')), h('span', null, 'average BP after')));
 
   const v = x => x ?? '';
   const bp = (a, b) => a != null && b != null ? `${a}/${b}` : '';
   const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date));
+  // Columns follow "What you record" in Settings: anything switched off is left out.
+  const cols = [
+    { head: 'Date', cell: s => M.niceDate(s.date) },
+    { head: 'Before kg', cell: s => M.fmt1(s.preWeight) },
+    { head: 'After kg', key: 'postWeight', cell: s => M.fmt1(s.postWeight) },
+    { head: 'Take off', cell: s => M.fmt1(M.takeOff(s)) },
+    { head: 'UF goal', key: 'ufGoal', cell: s => M.fmt1(s.ufGoal) },
+    { head: 'UF done', key: 'ufAchieved', cell: s => M.fmt1(s.ufAchieved) },
+    { head: 'BP before', key: 'preSys', cell: s => bp(s.preSys, s.preDia) },
+    { head: 'BP after', key: 'postSys', cell: s => bp(s.postSys, s.postDia) },
+    { head: 'Flow ml/min', key: 'bloodFlow', cell: s => v(s.bloodFlow) },
+    { head: 'Blood vol. L', key: 'bloodVolume', cell: s => M.fmt1(s.bloodVolume) },
+    { head: 'Notes', note: true, cell: s => [...(s.given || []).filter(g => !M.notesText(s).toLowerCase().includes(g.toLowerCase().split(' ')[0])), M.notesText(s)].filter(Boolean).join('. ') },
+  ].filter(c => !c.key || !hidden[c.key]);
   const sessionTable = sorted.length ? h('section', { class: 'section table-section' },
     h('div', { class: 'section-head' }, h('h2', null, 'Sessions')),
     h('div', { class: 'table-wrap' }, h('table', null,
-      h('thead', null, h('tr', null, ['Date', 'Before kg', 'After kg', 'Take off', 'UF goal', 'UF done', 'BP before', 'BP after', 'Flow', 'Notes'].map(t => h('th', { scope: 'col' }, t)))),
-      h('tbody', null, sorted.map(s => h('tr', null,
-        h('td', null, M.niceDate(s.date)), h('td', null, M.fmt1(s.preWeight)), h('td', null, M.fmt1(s.postWeight)),
-        h('td', null, M.fmt1(M.takeOff(s))), h('td', null, M.fmt1(s.ufGoal)), h('td', null, M.fmt1(s.ufAchieved)),
-        h('td', null, bp(s.preSys, s.preDia)), h('td', null, bp(s.postSys, s.postDia)), h('td', null, v(s.bloodFlow)),
-        h('td', { class: 'note' }, [...(s.given || []).filter(g => !M.notesText(s).toLowerCase().includes(g.toLowerCase().split(' ')[0])), M.notesText(s)].filter(Boolean).join('. ')))))))) : null;
+      h('thead', null, h('tr', null, cols.map(c => h('th', { scope: 'col' }, c.head)))),
+      h('tbody', null, sorted.map(s => h('tr', null, cols.map(c => h('td', c.note ? { class: 'note' } : null, c.cell(s))))))))) : null;
 
   return [sessions.length ? stats : null, weightChart(sessions), bpChart(sessions), sessionTable].filter(Boolean);
 }
