@@ -1,9 +1,9 @@
 // Keeps the app working offline. Uses the network first so updates show straight away,
 // and falls back to the saved copy when there's no signal.
-const CACHE = 'dt-v8';
+const CACHE = 'dt-v9';
 const SHELL = [
   '/', '/index.html', '/css/app.css', '/js/config.js', '/vendor/supabase.js',
-  '/js/app.js', '/js/db.js', '/js/model.js', '/js/sync.js', '/js/lock.js', '/js/ui.js', '/js/theme.js', '/js/sum.js', '/js/charts.js', '/js/export.js',
+  '/js/app.js', '/js/db.js', '/js/model.js', '/js/sync.js', '/js/lock.js', '/js/ui.js', '/js/theme.js', '/js/version.js', '/js/sum.js', '/js/charts.js', '/js/export.js',
   '/js/views/today.js', '/js/views/sessions.js', '/js/views/onboarding.js', '/js/views/share.js', '/js/views/supplies.js', '/js/views/reports.js', '/js/views/settings.js',
   '/fonts/ahn-400.woff2', '/fonts/ahn-600.woff2', '/fonts/ahn-800.woff2',
   '/icons/icon.svg', '/icons/icon-192.png', '/manifest.webmanifest',
@@ -21,7 +21,10 @@ self.addEventListener('fetch', e => {
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
-      const res = await fetch(e.request);
+      // Always check the server, never a stale browser copy.
+      const res = e.request.mode === 'navigate'
+        ? await fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' })
+        : await fetch(e.request, { cache: 'no-cache' });
       if (res.ok) cache.put(e.request, res.clone());
       return res;
     } catch (err) {

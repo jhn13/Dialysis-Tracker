@@ -194,7 +194,32 @@ async function boot() {
   });
   document.getElementById('boot').remove();
   await start();
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) setupUpdates();
+}
+
+// Keep the home-screen app up to date: check for a new version whenever it's opened,
+// and switch to it straight away unless you're in the middle of typing something.
+let reloadPending = false;
+function busy() {
+  const a = document.activeElement;
+  return document.querySelector('.scrim') || (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName));
+}
+function reloadWhenFree() {
+  if (!busy()) { location.reload(); return; }
+  reloadPending = true;
+}
+async function setupUpdates() {
+  const hadController = !!navigator.serviceWorker.controller;
+  let reg;
+  try { reg = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }); } catch (e) { return; }
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) reloadWhenFree(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (reloadPending && !busy()) { location.reload(); return; }
+    reg.update().catch(() => {});
+  });
+  document.addEventListener('focusout', () => setTimeout(() => { if (reloadPending && !busy()) location.reload(); }, 300));
+  setInterval(() => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); }, 30 * 60 * 1000);
 }
 
 boot().catch(e => {

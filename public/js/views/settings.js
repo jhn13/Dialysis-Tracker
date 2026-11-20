@@ -5,6 +5,7 @@ import * as sync from '../sync.js';
 import * as lock from '../lock.js';
 import * as X from '../export.js';
 import * as theme from '../theme.js';
+import { VERSION } from '../version.js';
 
 export async function render(main, { go }) {
   const st = M.settings();
@@ -159,5 +160,5 @@ export async function render(main, { go }) {
       } }, 'Delete everything on this device') : null));
 
   main.replaceChildren(treatment, appearance, fieldToggles, given, supplies, account, backup,
-    h('p', { class: 'hint', style: { textAlign: 'center' } }, 'Dialysis Tracker, test version 0.1. For keeping records only. It doesn’t give medical advice.'));
+    h('p', { class: 'hint', style: { textAlign: 'center' } }, `Dialysis Tracker, version ${VERSION}. For keeping records only. It doesn’t give medical advice.`));
 }
